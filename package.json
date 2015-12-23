@@ -89,7 +89,7 @@
     "merge-stream": "^1.0.0",
     "method-override": "^2.3.0",
     "moment": "^2.10.2",
-    "mongodb": "^2.0.33",
+    "mongodb": "^2.0.53",
     "morgan": "^1.6.1",
     "node-uuid": "^1.4.3",
     "nodemailer": "^1.9.0",
