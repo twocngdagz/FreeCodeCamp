@@ -1,10 +1,9 @@
 var main = window.main || {};
 
-main.mapShareKey = 'map-shares';
-
 main.ga = window.ga || function() {};
 
-main = (function(main) {
+main = (function(main, global) {
+  const { Mousetrap } = global;
 
   // should be set before gitter script loads
   ((window.gitter = {}).chat = {}).options = {
@@ -22,14 +21,17 @@ main = (function(main) {
     main.chat.GitterChat = e.detail.Chat;
 
     main.chat.createHelpChat = function(room, helpChatBtnClass, roomTitle) {
-      roomTitle = roomTitle || 'Waypoint Help';
+      // room is always in PascalCase
+      roomTitle = room
+        .replace(/([A-Z])/g, ' $1')
+        .replace('Java Script', 'JavaScript');
 
       $('body').append(
         '<aside id="chat-embed-help" class="gitter-chat-embed is-collapsed" />'
       );
 
       main.chat.helpChat = new main.chat.GitterChat({
-        room: room,
+        room: `freecodecamp/${room}`,
         activationElement: false,
         targetElement: $('#chat-embed-help')
       });
@@ -83,60 +85,56 @@ main = (function(main) {
         return null;
       }
       mainChatTitleAdded = true;
-
+      if ($('body').hasClass('night')) {
+        $('#chat-embed-main').addClass('night');
+      }
       $('#chat-embed-main > .gitter-chat-embed-action-bar').prepend(
         '<div class="chat-embed-main-title">' +
           '<span>Free Code Camp\'s Main Chat</span>' +
         '</div>'
       );
+      return null;
     });
 
 
-    $('#nav-chat-btn').on('click', function() {
-      if (!main.chat.isOpen) {
+    $('#nav-chat-btn').on('click', function(event) {
+      if (!(event.ctrlKey || event.metaKey)) {
+          toggleMainChat();
+      }
+      window.ga('send', 'event', 'Nav', 'clicked', 'Nav chat opened');
+  });
 
+    function showMainChat() {
+      if (!main.chat.isOpen) {
         main.chat.mainChat.toggleChat(true);
       }
-    });
+    }
+
+    function collapseMainChat() {
+      $('#chat-embed-main').addClass('is-collapsed');
+      document.activeElement.blur();
+    }
+
+    function toggleMainChat() {
+      var isCollapsed = $('#chat-embed-main').hasClass('is-collapsed');
+
+      if (isCollapsed) {
+        showMainChat();
+      } else {
+        collapseMainChat();
+      }
+    }
+
+    // keyboard shortcuts: open main chat
+    Mousetrap.bind('g c', toggleMainChat);
   });
 
   return main;
-}(main));
-
-var lastCompleted = typeof lastCompleted !== 'undefined' ?
-  lastCompleted :
-  '';
-
-main.getMapShares = function getMapShares() {
-  var alreadyShared = JSON.parse(
-    localStorage.getItem(main.mapShareKey) ||
-    '[]'
-  );
-
-  if (!alreadyShared || !Array.isArray(alreadyShared)) {
-    localStorage.setItem(main.mapShareKey, JSON.stringify([]));
-    alreadyShared = [];
-  }
-  return alreadyShared;
-};
-
-main.setMapShare = function setMapShare(id) {
-  var alreadyShared = main.getMapShares();
-  var found = false;
-  alreadyShared.forEach(function(_id) {
-    if (_id === id) {
-      found = true;
-    }
-  });
-  if (!found) {
-    alreadyShared.push(id);
-  }
-  localStorage.setItem(main.mapShareKey, JSON.stringify(alreadyShared));
-  return alreadyShared;
-};
+}(main, window));
 
 $(document).ready(function() {
 
+  const { Observable } = window.Rx;
   var CSRF_HEADER = 'X-CSRF-Token';
 
   var setCSRFToken = function(securityToken) {
@@ -158,101 +156,123 @@ $(document).ready(function() {
       );
   });
 
-  function upvoteHandler(e) {
-    e.preventDefault();
-    var upvoteBtn = this;
-    var id = upvoteBtn.id;
-    var upVotes = $(upvoteBtn).data().upVotes;
-    var username = typeof username !== 'undefined' ? username : '';
-    var alreadyUpvoted = false;
-    for (var i = 0; i < upVotes.length; i++) {
-      if (upVotes[i].upVotedBy === username) {
-        alreadyUpvoted = true;
-        break;
-      }
+  $.each($('.sr-only'), function(i, span) {
+    if ($(span).text() === ' Complete') {
+      $(span).parents('p').addClass('manip-hidden');
     }
-    if (!alreadyUpvoted) {
-      $.post('/stories/upvote', { id: id })
-        .fail(function() {
-          $(upvoteBtn).bind('click', upvoteHandler);
-        })
-        .done(function(data) {
-          $(upvoteBtn)
-            .text('Upvoted!')
-            .addClass('disabled');
-
-          $('#storyRank').text(data.rank + ' points');
-        });
-    }
-  }
-
-  $('#story-list').on('click', 'button.btn-upvote', upvoteHandler);
-
-  var storySubmitButtonHandler = function storySubmitButtonHandler() {
-
-    if (!$('#story-submission-form')[0].checkValidity()) {
-      return null;
-    }
-
-    var link = $('#story-url').val();
-    var headline = $('#story-title').val();
-    var description = $('#description-box').val();
-    var data = {
-      data: {
-        link: link,
-        headline: headline,
-        timePosted: Date.now(),
-        description: description,
-        storyMetaDescription: main.storyMetaDescription,
-        rank: 1,
-        image: main.storyImage
-      }
-    };
-
-    $('#story-submit').unbind('click');
-    $.post('/stories/', data)
-      .fail(function() {
-        $('#story-submit').bind('click', storySubmitButtonHandler);
-      })
-      .done(function(data) {
-        window.location = '/stories/' + data.storyLink;
-      });
-  };
-
-  $('#story-submit').on('click', storySubmitButtonHandler);
-
-
-  // map sharing
-  var alreadyShared = main.getMapShares();
-
-  if (lastCompleted && alreadyShared.indexOf(lastCompleted) === -1) {
-    $('div[id="' + lastCompleted + '"]')
-      .parent()
-      .parent()
-      .removeClass('hidden');
-  }
-
-  // on map view
-  $('.map-challenge-block-share').on('click', function(e) {
-    e.preventDefault();
-    var challengeBlockName = $(this).children().attr('id');
-    var challengeBlockEscapedName = challengeBlockName.replace(/\s/, '%20');
-    var username = typeof window.username !== 'undefined' ?
-      window.username :
-      '';
-
-    var link = 'https://www.facebook.com/dialog/feed?' +
-      'app_id=1644598365767721' +
-      '&display=page&' +
-      'caption=I%20just%20completed%20the%20' +
-      challengeBlockEscapedName +
-      '%20section%20on%20Free%20Code%20Camp%2E' +
-      '&link=http%3A%2F%2Ffreecodecamp%2Ecom%2F' +
-      username +
-      '&redirect_uri=http%3A%2F%2Ffreecodecamp%2Ecom%2Fmap';
-
-    main.setMapShare(challengeBlockName);
-    window.ga('send', 'event', 'FB_LINK', 'SHARE', 'Facebook map share');
-    window.location.href = link;
   });
+
+  function addAlert(message = '', type = 'alert-info') {
+    return $('.flashMessage').append($(`
+      <div class='alert ${type}'>
+        <button class='close' type='button', data-dismiss='alert'>
+          <span class='ion-close-circled' />
+        </Button>
+        <div>${message}</div>
+      </div>
+    `));
+  }
+
+  function toggleNightMode() {
+    if (!main.userId) {
+      return addAlert('You must be logged in to use our themes.');
+    }
+    const iframe$ = document.getElementById('map-aside-frame');
+    const body$ = $('body');
+    if (iframe$) {
+      iframe$.src = iframe$.src;
+    }
+    body$.hide();
+    let updateThemeTo;
+    if (body$.hasClass('night')) {
+      body$.removeClass('night');
+      updateThemeTo = 'default';
+    } else {
+      body$.addClass('night');
+      updateThemeTo = 'night';
+    }
+    body$.fadeIn('100');
+    const options = {
+      url: `/api/users/${main.userId}/update-theme`,
+      type: 'POST',
+      data: { theme: updateThemeTo },
+      dataType: 'json'
+    };
+    return $.ajax(options)
+      .success(() => console.log('theme updated successfully'))
+      .fail(err => {
+        let message;
+        try {
+          message = JSON.parse(err.responseText).error.message;
+        } catch (error) {
+          return null;
+        }
+        if (!message) {
+          return null;
+        }
+        return addAlert(message);
+      });
+  }
+
+  Observable.merge(
+    Observable.fromEvent($('#night-mode'), 'click'),
+    Observable.create(observer => {
+      window.Mousetrap.bind('g t n', () => observer.onNext());
+    })
+  )
+    .debounce(500)
+    .subscribe(toggleNightMode, err => console.error(err));
+
+  // Hot Keys
+  window.Mousetrap.bind('g n n', () => {
+    // Next Challenge
+    window.location = '/challenges/next-challenge';
+  });
+  window.Mousetrap.bind('g n m', () => {
+    // Map
+    window.location = '/map';
+  });
+  window.Mousetrap.bind('g n a', () => {
+    // About
+    window.location = '/about';
+  });
+  window.Mousetrap.bind('g n s', () => {
+    // Shop
+    window.location = '/shop';
+  });
+  window.Mousetrap.bind('g n o', () => {
+    // Settings
+    window.location = '/settings';
+  });
+  window.Mousetrap.bind('g n r', () => {
+    // Repo
+    window.location = 'https://github.com/freecodecamp/freecodecamp/';
+  });
+
+  (function getFlyer() {
+    const flyerKey = '__flyerId__';
+    $.ajax({
+      url: '/api/flyers/findOne',
+      method: 'GET',
+      dataType: 'JSON',
+      data: { filter: { order: 'id DESC' } }
+    })
+    // log error
+    .fail(err => console.error(err))
+    .done(flyer => {
+      const lastFlyerId = localStorage.getItem(flyerKey);
+      if (
+        !flyer ||
+        !flyer.isActive ||
+        lastFlyerId === flyer.id
+      ) {
+        return;
+      }
+      $('#dismiss-bill').on('click', () => {
+        localStorage.setItem(flyerKey, flyer.id);
+      });
+      $('#bill-content').html(flyer.message);
+      $('#bill-board').fadeIn();
+    });
+  }());
 });

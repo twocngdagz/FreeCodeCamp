@@ -1,23 +1,11 @@
 [{
-  "content": "Map",
-  "link": "/map"
-}, {
-  "content": "Chat",
-  "link": "//gitter.im/FreeCodeCamp/FreeCodeCamp",
+  "content": "Forum",
+  "link": "http://forum.freecodecamp.com/",
   "target": "_blank"
 },{
-  "content": "News",
-  "link": "/news",
-  "target": "_blank"
+  "content": "About",
+  "link": "/about"
 },{
-  "content": "Wiki",
-  "link": "https://github.com/freecodecamp/freecodecamp/wiki/",
-  "target": "_blank"
-},{
-  "content": "Jobs",
-  "link": "/jobs",
-  "react": true
-},{
-  "content": "Links",
-  "link": "/links"
+  "content": "Shop",
+  "link": "/shop"
 }]

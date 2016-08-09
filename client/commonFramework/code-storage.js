@@ -5,6 +5,18 @@ window.common = (function(global) {
     common = { init: [] }
   } = global;
 
+  const {
+    replaceNoprotect
+  } = common;
+
+  var challengePrefix = [
+    'Bonfire: ',
+    'Waypoint: ',
+    'Zipline: ',
+    'Basejump: ',
+    'Checkpoint: '],
+  item;
+
   var codeStorage = {
     getStoredValue(key) {
       if (
@@ -16,7 +28,17 @@ window.common = (function(global) {
         console.log('unable to read from storage');
         return '';
       }
-      return '' + localStorage.getItem(key + 'Val');
+      if (localStorage.getItem(key + 'Val')) {
+        return '' + localStorage.getItem(key + 'Val');
+      } else {
+        for (var i = 0; i <= challengePrefix.length; i++) {
+          item = localStorage.getItem(challengePrefix[i] + key + 'Val');
+          if (item) {
+            return '' + item;
+          }
+        }
+      }
+      return null;
     },
 
     isAlive: function(key) {
@@ -36,7 +58,7 @@ window.common = (function(global) {
         console.log('unable to save to storage');
         return code;
       }
-      localStorage.setItem(key + 'Val', code);
+      localStorage.setItem(key + 'Val', replaceNoprotect(code));
       return code;
     }
   };

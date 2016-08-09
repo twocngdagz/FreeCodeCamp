@@ -30,14 +30,21 @@ window.common = (function(global) {
 
   codeOutput.setValue(`/**
   * Your output will go here.
-  * Console.log() -type statements
-  * will appear in your browser\'s
-  * DevTools JavaScript console.
+  * Any console.log() - type
+  * statements will appear in
+  * your browser\'s DevTools
+  * JavaScript console as well.
   */`);
 
   codeOutput.setSize('100%', '100%');
 
   common.updateOutputDisplay = function updateOutputDisplay(str = '') {
+    if (typeof str === 'function') {
+      str = str.toString();
+    }
+    if (typeof str !== 'string') {
+      str = JSON.stringify(str);
+    }
     codeOutput.setValue(str);
     return str;
   };

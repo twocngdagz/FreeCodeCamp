@@ -51,10 +51,10 @@ $(document).ready(function() {
               <h1>${err}</h1>
             `).subscribe(() => {});
           }
+          return null;
         },
         err => console.error(err)
       );
-
   }
 
   common.resetBtn$
@@ -66,13 +66,16 @@ $(document).ready(function() {
         .catch(err => Observable.just({ err }));
     })
     .subscribe(
-      ({ err, output, originalCode }) => {
+      ({ err, output, originalCode, tests }) => {
         if (err) {
           console.error(err);
           return common.updateOutputDisplay('' + err);
         }
         common.codeStorage.updateStorage(challengeName, originalCode);
-        common.updateOutputDisplay('' + output);
+        common.codeUri.querify(originalCode);
+        common.displayTestResults(tests, true);
+        common.updateOutputDisplay(output);
+        return null;
       },
       (err) => {
         if (err) {
@@ -106,11 +109,12 @@ $(document).ready(function() {
           }
           return common.updateOutputDisplay('' + err);
         }
-        common.updateOutputDisplay('' + output);
-        common.displayTestResults(tests);
+        common.updateOutputDisplay(output);
+        common.displayTestResults(tests, true);
         if (solved) {
           common.showCompletion();
         }
+        return null;
       },
       ({ err }) => {
         console.error(err);
@@ -136,7 +140,8 @@ $(document).ready(function() {
             }
             return common.updateOutputDisplay('' + err);
           }
-          common.displayTestResults(tests);
+          common.displayTestResults(tests, false);
+          return null;
         },
         ({ err }) => {
           console.error(err);
@@ -148,7 +153,7 @@ $(document).ready(function() {
     challengeType === challengeTypes.BONFIRE ||
     challengeType === challengeTypes.JS
   ) {
-    Observable.just({})
+    return Observable.just({})
       .delay(500)
       .flatMap(() => common.executeChallenge$())
       .catch(err => Observable.just({ err }))
@@ -159,7 +164,8 @@ $(document).ready(function() {
             return common.updateOutputDisplay('' + err);
           }
           common.codeStorage.updateStorage(challengeName, originalCode);
-          common.displayTestResults(tests);
+          common.displayTestResults(tests, false);
+          return null;
         },
         (err) => {
           console.error(err);
@@ -167,4 +173,5 @@ $(document).ready(function() {
         }
       );
   }
+  return null;
 });

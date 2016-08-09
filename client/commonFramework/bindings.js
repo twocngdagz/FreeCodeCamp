@@ -2,7 +2,8 @@ window.common = (function(global) {
   const {
     $,
     Rx: { Observable },
-    common = { init: [] }
+    common = { init: [] },
+    Mousetrap
   } = global;
 
   common.ctrlEnterClickHandler = function ctrlEnterClickHandler(e) {
@@ -42,6 +43,11 @@ window.common = (function(global) {
       );
     });
 
+    // set focus keybind
+    Mousetrap.bind(['command+shift+e', 'ctrl+shift+e'], () => {
+        common.editor.focus();
+    });
+
     // video checklist binding
     $('.challenge-list-checkbox').on('change', function() {
       var checkboxId = $(this).parent().parent().attr('id');
@@ -74,16 +80,22 @@ window.common = (function(global) {
       $('#next-courseware-button').unbind('click');
       if ($('.signup-btn-nav').length < 1) {
         var data;
-        var completedWith = $('#completed-with').val() || null;
-        var publicURL = $('#public-url').val() || null;
-        var githubURL = $('#github-url').val() || null;
+        var solution = $('#public-url').val() || null;
+        var githubLink = $('#github-url').val() || null;
         switch (common.challengeType) {
           case common.challengeTypes.VIDEO:
             data = {
               id: common.challengeId,
-              name: common.challengeName
+              name: common.challengeName,
+              challengeType: +common.challengeType
             };
-            $.post('/completed-challenge/', data)
+            $.ajax({
+              url: '/completed-challenge/',
+              type: 'POST',
+              data: JSON.stringify(data),
+              contentType: 'application/json',
+              dataType: 'json'
+            })
               .success(function(res) {
                 if (!res) {
                   return;
@@ -92,25 +104,27 @@ window.common = (function(global) {
                   common.challengeId;
               })
               .fail(function() {
-                window.location.href = '/challenges';
+                window.location.replace(window.location.href);
               });
 
             break;
           case common.challengeTypes.BASEJUMP:
           case common.challengeTypes.ZIPLINE:
             data = {
-              challengeInfo: {
-                challengeId: common.challengeId,
-                challengeName: common.challengeName,
-                completedWith: completedWith,
-                publicURL: publicURL,
-                githubURL: githubURL,
-                challengeType: common.challengeType,
-                verified: false
-              }
+              id: common.challengeId,
+              name: common.challengeName,
+              challengeType: +common.challengeType,
+              solution,
+              githubLink
             };
 
-            $.post('/completed-zipline-or-basejump/', data)
+            $.ajax({
+              url: '/completed-zipline-or-basejump/',
+              type: 'POST',
+              data: JSON.stringify(data),
+              contentType: 'application/json',
+              dataType: 'json'
+            })
               .success(function() {
                 window.location.href = '/challenges/next-challenge?id=' +
                   common.challengeId;
@@ -133,8 +147,13 @@ window.common = (function(global) {
     });
 
     if (common.challengeName) {
-      window.ga('send', 'event', 'Challenge', 'load', common.challengeName);
+      window.ga('send', 'event', 'Challenge', 'loaded', common.gaName);
     }
+
+    $('.modal').on('show.bs.modal', function() {
+      $('.gitter-chat-embed, .map-aside')
+        .addClass('is-collapsed');
+    });
 
     $('#complete-courseware-dialog').on('hidden.bs.modal', function() {
       if (common.editor.focus) {
@@ -162,10 +181,17 @@ window.common = (function(global) {
       $('#complete-courseware-dialog').modal('show');
     });
 
+    $('#show-solution').on('click', function() {
+      $('#complete-courseware-dialog').modal('hide');
+    });
+
+    $('#challenge-help-btn').on('click', function() {
+      $('.map-aside, #chat-embed-main').addClass('is-collapsed');
+    });
+
     $('#help-ive-found-a-bug-wiki-article').on('click', function() {
       window.open(
-        'https://github.com/FreeCodeCamp/FreeCodeCamp/wiki/' +
-          "Help-I've-Found-a-Bug",
+        'http://forum.freecodecamp.com/t/how-to-report-a-bug/19543',
         '_blank'
       );
     });

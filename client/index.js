@@ -1,91 +1,83 @@
-import unused from './es6-shims'; // eslint-disable-line
+import './es6-shims';
 import Rx from 'rx';
 import React from 'react';
-import Fetchr from 'fetchr';
-import debugFactory from 'debug';
+import debug from 'debug';
 import { Router } from 'react-router';
-import { createLocation, createHistory } from 'history';
-import { hydrate } from 'thundercats';
-import { Render } from 'thundercats-react';
+import {
+  routerMiddleware,
+  routerReducer as routing,
+  syncHistoryWithStore
+} from 'react-router-redux';
+import { render } from 'redux-epic';
+import { createHistory } from 'history';
+import useLangRoutes from './utils/use-lang-routes';
+import sendPageAnalytics from './utils/send-page-analytics.js';
 
-import { app$ } from '../common/app';
+import createApp from '../common/app';
+import provideStore from '../common/app/provide-store';
 
-const debug = debugFactory('fcc:client');
-const DOMContianer = document.getElementById('fcc');
-const catState = window.__fcc__.data || {};
-const services = new Fetchr({
-  xhrPath: '/services'
-});
+// client specific sagas
+import sagas from './sagas';
 
-Rx.config.longStackSupport = !!debug.enabled;
-const history = createHistory();
-const appLocation = createLocation(
-  location.pathname + location.search
-);
+import {
+  isColdStored,
+  getColdStorage,
+  saveToColdStorage
+} from './cold-reload';
 
-function location$(history) {
-  return Rx.Observable.create(function(observer) {
-    const dispose = history.listen(function(location) {
-      observer.onNext(location.pathname);
-    });
+const isDev = Rx.config.longStackSupport = debug.enabled('fcc:*');
+const log = debug('fcc:client');
+const hotReloadTimeout = 5000;
+const csrfToken = window.__fcc__.csrf.token;
+const DOMContainer = document.getElementById('fcc');
+const initialState = isColdStored() ?
+  getColdStorage() :
+  window.__fcc__.data;
+initialState.app.csrfToken = csrfToken;
 
-    return Rx.Disposable.create(() => {
-      dispose();
-    });
-  });
-}
+const serviceOptions = { xhrPath: '/services', context: { _csrf: csrfToken } };
 
-// returns an observable
-app$({ history, location: appLocation })
-  .flatMap(
-    ({ AppCat }) => {
-      // instantiate the cat with service
-      const appCat = AppCat(null, services);
-      // hydrate the stores
-      return hydrate(appCat, catState)
-        .map(() => appCat);
-    },
-    // not using nextLocation at the moment but will be used for
-    // redirects in the future
-    ({ nextLocation, props }, appCat) => ({ nextLocation, props, appCat })
-  )
-  .doOnNext(({ appCat }) => {
-    const appActions = appCat.getActions('appActions');
+const history = useLangRoutes(createHistory)();
+sendPageAnalytics(history, window.ga);
 
-    location$(history)
-      .pluck('pathname')
-      .distinctUntilChanged()
-      .doOnNext(route => debug('route change', route))
-      .subscribe(route => appActions.updateRoute(route));
+const devTools = window.devToolsExtension ? window.devToolsExtension() : f => f;
+const adjustUrlOnReplay = !!window.devToolsExtension;
 
-    appActions.goBack.subscribe(function() {
-      history.goBack();
-    });
+const sagaOptions = {
+  isDev,
+  window,
+  document: window.document,
+  location: window.location,
+  history: window.history
+};
 
-    appActions
-      .updateRoute
-      .pluck('route')
-      .doOnNext(route => debug('update route', route))
-      .subscribe(function(route) {
-        history.pushState(null, route);
+createApp({
+    history,
+    syncHistoryWithStore,
+    syncOptions: { adjustUrlOnReplay },
+    serviceOptions,
+    initialState,
+    middlewares: [ routerMiddleware(history) ],
+    sagas: [...sagas ],
+    sagaOptions,
+    reducers: { routing },
+    enhancers: [ devTools ]
+  })
+  .doOnNext(({ store }) => {
+    if (module.hot && typeof module.hot.accept === 'function') {
+      module.hot.accept('../common/app', function() {
+        saveToColdStorage(store.getState());
+        setTimeout(() => window.location.reload(), hotReloadTimeout);
       });
-  })
-  .flatMap(({ props, appCat }) => {
-    props.history = history;
-    return Render(
-      appCat,
-      React.createElement(Router, props),
-      DOMContianer
-    );
-  })
-  .subscribe(
-    () => {
-      debug('react rendered');
-    },
-    err => {
-      throw err;
-    },
-    () => {
-      debug('react closed subscription');
     }
+  })
+  .doOnNext(() => log('rendering'))
+  .flatMap(({ props, store }) => render(
+    provideStore(React.createElement(Router, props), store),
+    DOMContainer
+  ))
+  .subscribe(
+    () => debug('react rendered'),
+    err => { throw err; },
+    () => debug('react closed subscription')
   );

@@ -13,8 +13,6 @@ window.common = (function(global) {
     challengeTypes
   } = common;
 
-  let attempts = 0;
-
   common.executeChallenge$ = function executeChallenge$() {
     const code = common.editor.getValue();
     const originalCode = code;
@@ -22,9 +20,7 @@ window.common = (function(global) {
     const tail = common.arrayToNewLineString(common.tail);
     const combinedCode = head + code + tail;
 
-    attempts++;
-
-    ga('send', 'event', 'Challenge', 'ran-code', common.challengeName);
+    ga('send', 'event', 'Challenge', 'ran-code', common.gaName);
 
     // run checks for unsafe code
     return detectUnsafeCode$(code)

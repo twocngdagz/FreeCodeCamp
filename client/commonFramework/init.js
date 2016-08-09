@@ -28,10 +28,14 @@ window.common = (function(global) {
     seedData = Array.isArray(seedData) ? seedData : [seedData];
     return seedData.reduce(function(seed, line) {
       return '' + seed + line + '\n';
-    }, '');
+    }, '\n');
   };
 
   common.seed = common.arrayToNewLineString(common.challengeSeed);
+
+  common.replaceNoprotect = function replaceNoprotect(value) {
+    return value.replace(/noprotect/gi, '');
+  };
 
   common.replaceScriptTags = function replaceScriptTags(value) {
     return value
